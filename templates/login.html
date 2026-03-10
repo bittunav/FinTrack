@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Login — FinTrack{% endblock %}
+{% block content %}
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;margin:-32px;">
+  <div style="width:400px;padding:48px 40px;">
+    <div style="text-align:center;margin-bottom:40px;">
+      <div style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;letter-spacing:-1px;">Fin<span style="color:var(--accent)">Track</span></div>
+      <p style="color:var(--text-muted);margin-top:8px;font-size:14px;">Sign in to your account</p>
+    </div>
+    <div class="card">
+      <form method="POST">
+        <div class="form-group" style="margin-bottom:16px">
+          <label>Username</label>
+          <input type="text" name="username" required placeholder="your_username" autofocus>
+        </div>
+        <div class="form-group" style="margin-bottom:24px">
+          <label>Password</label>
+          <input type="password" name="password" required placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Sign In</button>
+      </form>
+      <p style="text-align:center;margin-top:20px;font-size:13px;color:var(--text-muted);">
+        No account? <a href="{{ url_for('register') }}" style="color:var(--accent)">Register</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

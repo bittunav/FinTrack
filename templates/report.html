@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Report — FinTrack{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+    <div>
+      <h1 class="page-title">Monthly Report</h1>
+      <p class="page-subtitle">Detailed breakdown for {{ month }}</p>
+    </div>
+    <form method="GET">
+      <select name="month" onchange="this.form.submit()" style="padding:10px 14px;">
+        {% for m in available_months %}
+        <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+</div>
+
+<!-- SUMMARY STATS -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Spent</div>
+    <div class="stat-value">{{ currency }}{{ total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Last Month</div>
+    <div class="stat-value">{{ currency }}{{ prev_total }}</div>
+  </div>
+  <div class="stat-card {% if change_pct > 0 %}red{% else %}green{% endif %}">
+    <div class="stat-label">Month-over-Month</div>
+    <div class="stat-value">{% if change_pct > 0 %}+{% endif %}{{ change_pct }}%</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Transactions</div>
+    <div class="stat-value">{{ expenses|length }}</div>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:24px;">
+  <!-- CATEGORY BREAKDOWN -->
+  <div class="card">
+    <div class="card-title">Spending by Category</div>
+    {% if by_cat %}
+    {% for cat, amt in by_cat.items() %}
+    {% set pct = ((amt / total) * 100)|round(1) if total > 0 else 0 %}
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;">
+        <span class="badge badge-{{ cat.lower() }}">{{ cat }}</span>
+        <span><strong>{{ currency }}{{ amt }}</strong> <span style="color:var(--text-muted);">({{ pct }}%)</span></span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:{{ pct }}%;"></div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p style="color:var(--text-muted);font-size:13px;">No data for this month.</p>
+    {% endif %}
+  </div>
+
+  <!-- BUDGET COMPARISON -->
+  <div class="card">
+    <div class="card-title">Budget vs Actual</div>
+    {% if budget_comparison %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Budget</th>
+            <th>Spent</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in budget_comparison %}
+          <tr>
+            <td><span class="badge badge-{{ b.category.lower() }}">{{ b.category }}</span></td>
+            <td>{{ currency }}{{ b.budget }}</td>
+            <td>{{ currency }}{{ b.spent }}</td>
+            <td>
+              {% if b.over %}
+              <span style="color:var(--danger);font-size:12px;font-weight:600;">⚠️ Over</span>
+              {% else %}
+              <span style="color:var(--success);font-size:12px;">✓ OK</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:13px;">No budgets set for this month. <a href="{{ url_for('budget') }}" style="color:var(--accent)">Set budgets →</a></p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- TRANSACTIONS -->
+<div class="card">
+  <div class="card-title">All Transactions in {{ month }}</div>
+  {% if expenses %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td style="color:var(--text-muted);font-size:13px;">{{ e.date }}</td>
+          <td>{{ e.description }}</td>
+          <td><span class="badge badge-{{ e.category.lower() }}">{{ e.category }}</span></td>
+          <td class="amount-cell">{{ currency }}{{ "%.2f"|format(e.amount) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:40px;color:var(--text-muted);">No transactions for {{ month }}.</div>
+  {% endif %}
+</div>
+{% endblock %}

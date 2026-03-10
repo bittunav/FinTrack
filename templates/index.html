@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — FinTrack{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">Track your spending at a glance</p>
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('addModal').style.display='flex'">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Add Expense
+    </button>
+  </div>
+</div>
+
+<!-- STAT CARDS -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Filtered Total</div>
+    <div class="stat-value">{{ currency }}{{ total }}</div>
+  </div>
+  {% for alert in budget_alerts %}
+  {% if alert.over %}
+  <div class="stat-card red">
+    <div class="stat-label">⚠️ Over Budget — {{ alert.category }}</div>
+    <div class="stat-value">{{ currency }}{{ alert.spent }}</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Limit: {{ currency }}{{ alert.limit }}</div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<!-- BUDGET ALERTS -->
+{% if budget_alerts %}
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-title">📊 This Month's Budget Tracker</div>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:16px;">
+    {% for a in budget_alerts %}
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+        <span>{{ a.category }}</span>
+        <span style="color:{% if a.over %}var(--danger){% elif a.pct > 75 %}var(--warning){% else %}var(--text-muted){% endif %}">
+          {{ currency }}{{ a.spent }} / {{ currency }}{{ a.limit }}
+        </span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill {% if a.over %}danger{% elif a.pct > 75 %}warning{% endif %}" style="width:{{ [a.pct, 100]|min }}%"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:3px">{{ a.pct }}% used</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- FILTERS -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-title">🔍 Filter Expenses</div>
+  <form method="GET" action="/">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>From</label>
+        <input type="date" name="start" value="{{ request.args.get('start','') }}">
+      </div>
+      <div class="form-group">
+        <label>To</label>
+        <input type="date" name="end" value="{{ request.args.get('end','') }}">
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select name="category">
+          <option value="">All Categories</option>
+          {% for c in categories %}<option {% if request.args.get('category') == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="justify-content:flex-end;">
+        <label>&nbsp;</label>
+        <div style="display:flex;gap:8px;">
+          <button type="submit" class="btn btn-primary">Filter</button>
+          <a href="/" class="btn btn-ghost">Reset</a>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- CHARTS -->
+<div class="grid-2" style="margin-bottom:20px;">
+  <div class="card">
+    <div class="card-title">By Category</div>
+    <canvas id="catChart" height="200"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">Spending Over Time</div>
+    <canvas id="dayChart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- EXPENSES TABLE -->
+<div class="card">
+  <div class="card-title">Recent Expenses</div>
+  {% if expenses %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td style="color:var(--text-muted);font-size:13px">{{ e.date }}</td>
+          <td>
+            {{ e.description }}
+            {% if e.is_recurring %}<span style="font-size:10px;color:var(--accent);margin-left:6px">↻ {{ e.recurrence }}</span>{% endif %}
+          </td>
+          <td><span class="badge badge-{{ e.category.lower() }}">{{ e.category }}</span></td>
+          <td class="amount-cell">{{ currency }}{{ "%.2f"|format(e.amount) }}</td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <a href="{{ url_for('edit', expense_id=e.id) }}" class="btn btn-ghost btn-sm">Edit</a>
+              <form method="POST" action="{{ url_for('delete', expense_id=e.id) }}" onsubmit="return confirm('Delete this expense?')">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:48px;color:var(--text-muted);">
+    <div style="font-size:40px;margin-bottom:12px;">💸</div>
+    <p>No expenses found. Add your first one!</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ADD EXPENSE MODAL -->
+<div id="addModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
+  <div class="card" style="width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;">Add Expense</h2>
+      <button onclick="document.getElementById('addModal').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;">✕</button>
+    </div>
+    <form method="POST" action="/add">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Description</label>
+          <input type="text" name="description" required placeholder="e.g. Lunch at Zomato">
+        </div>
+        <div class="form-group">
+          <label>Amount ({{ currency }})</label>
+          <input type="number" name="amount" step="0.01" min="0" required placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category" required>
+            {% for c in categories %}<option>{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" name="date" value="{{ today }}" required>
+        </div>
+        <div class="form-group">
+          <label>Recurring?</label>
+          <select name="recurrence" onchange="document.getElementById('recurToggle').checked=this.value!==''">
+            <option value="">Not recurring</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <input type="hidden" name="is_recurring" id="recurToggle" value="">
+        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" onclick="document.getElementById('addModal').style.display='none'" class="btn btn-ghost">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Expense</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const catLabels = {{ cat_labels | tojson }};
+const catValues = {{ cat_values | tojson }};
+const dayLabels = {{ day_labels | tojson }};
+const dayValues = {{ day_values | tojson }};
+
+const colors = ['#7c6af7','#4ecdab','#f76a6a','#f5a524','#60a5fa','#e879f9','#4ade80','#fb923c','#a78bfa'];
+
+new Chart(document.getElementById('catChart'), {
+  type: 'doughnut',
+  data: {
+    labels: catLabels,
+    datasets: [{ data: catValues, backgroundColor: colors, borderWidth: 0 }]
+  },
+  options: {
+    plugins: { legend: { position: 'right', labels: { color: '#7a7a96', font: { size: 12 } } } },
+    cutout: '65%'
+  }
+});
+
+new Chart(document.getElementById('dayChart'), {
+  type: 'line',
+  data: {
+    labels: dayLabels,
+    datasets: [{
+      data: dayValues,
+      borderColor: '#7c6af7',
+      backgroundColor: 'rgba(124,106,247,0.1)',
+      fill: true,
+      tension: 0.4,
+      pointRadius: 4,
+      pointBackgroundColor: '#7c6af7'
+    }]
+  },
+  options: {
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#7a7a96', maxRotation: 45 }, grid: { color: '#2a2a38' } },
+      y: { ticks: { color: '#7a7a96' }, grid: { color: '#2a2a38' } }
+    }
+  }
+});
+</script>
+{% endblock %}

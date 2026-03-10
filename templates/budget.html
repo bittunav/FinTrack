@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Budget — FinTrack{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Budget Goals</h1>
+  <p class="page-subtitle">Set monthly spending limits per category — {{ current_month }}</p>
+</div>
+
+<div class="grid-2" style="margin-bottom:24px;">
+  <div class="card">
+    <div class="card-title">Set Budget Limit</div>
+    <form method="POST">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category" required>
+            {% for c in categories %}<option>{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Monthly Limit ({{ currency }})</label>
+          <input type="number" name="limit_amount" step="0.01" min="1" required placeholder="e.g. 5000">
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <button type="submit" class="btn btn-primary">Set Budget</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💡 Budgeting Tips</div>
+    <div style="font-size:13px;color:var(--text-muted);line-height:1.8;">
+      <p>📌 The <strong style="color:var(--text)">50/30/20 rule</strong>: 50% needs, 30% wants, 20% savings</p>
+      <p style="margin-top:8px;">⚠️ Budget alerts appear on the Dashboard when you exceed a limit</p>
+      <p style="margin-top:8px;">🔄 Budgets are set <strong style="color:var(--text)">per month</strong> — update them each month as needed</p>
+    </div>
+  </div>
+</div>
+
+{% if budgets %}
+<div class="card">
+  <div class="card-title">This Month's Budget Status</div>
+  <div style="display:flex;flex-direction:column;gap:20px;">
+    {% for b in budgets %}
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="badge badge-{{ b.category.lower() }}">{{ b.category }}</span>
+          <span style="font-size:13px;color:var(--text-muted);">
+            {{ currency }}{{ b.spent }} spent of {{ currency }}{{ b.limit }} limit
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          {% if b.over %}
+          <span style="font-size:12px;color:var(--danger);font-weight:600;">⚠️ OVER by {{ currency }}{{ (b.spent - b.limit)|round(2)|abs }}</span>
+          {% else %}
+          <span style="font-size:12px;color:var(--success);">✓ {{ currency }}{{ b.remaining }} left</span>
+          {% endif %}
+          <form method="POST" action="{{ url_for('delete_budget', budget_id=b.id) }}">
+            <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+          </form>
+        </div>
+      </div>
+      <div class="progress-bar" style="height:8px;">
+        <div class="progress-fill {% if b.over %}danger{% elif b.pct > 75 %}warning{% endif %}" style="width:{{ b.pct }}%"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ b.pct }}% of budget used</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:60px;">
+  <div style="font-size:48px;margin-bottom:16px;">🎯</div>
+  <p style="color:var(--text-muted);">No budgets set for {{ current_month }}. Add your first one above!</p>
+</div>
+{% endif %}
+{% endblock %}

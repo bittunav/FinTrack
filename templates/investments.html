@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Investments — FinTrack{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+    <div>
+      <h1 class="page-title">Investments</h1>
+      <p class="page-subtitle">Track mutual funds, insurance, stocks & more</p>
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('addInvModal').style.display='flex'">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Add Investment
+    </button>
+  </div>
+</div>
+
+<!-- STAT CARDS -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Invested</div>
+    <div class="stat-value">{{ currency }}{{ total_invested }}</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-label">Current Value</div>
+    <div class="stat-value">{{ currency }}{{ total_current }}</div>
+  </div>
+  <div class="stat-card {% if total_gain >= 0 %}green{% else %}red{% endif %}">
+    <div class="stat-label">Total Gain / Loss</div>
+    <div class="stat-value">{% if total_gain >= 0 %}+{% endif %}{{ currency }}{{ total_gain }}</div>
+  </div>
+  <div class="stat-card {% if gain_pct >= 0 %}green{% else %}red{% endif %}">
+    <div class="stat-label">Overall Return</div>
+    <div class="stat-value">{% if gain_pct >= 0 %}+{% endif %}{{ gain_pct }}%</div>
+  </div>
+</div>
+
+{% if investments %}
+<!-- CHART + TABLE -->
+<div class="grid-2" style="margin-bottom:24px;">
+  <div class="card">
+    <div class="card-title">Portfolio Allocation</div>
+    <canvas id="invChart" height="220"></canvas>
+  </div>
+  <div class="card">
+    <div class="card-title">Performance by Type</div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px;">
+      {% set types_seen = [] %}
+      {% for inv in investments %}
+        {% if inv.type not in types_seen %}
+          {% set _ = types_seen.append(inv.type) %}
+          {% set type_invested = investments | selectattr('type','equalto',inv.type) | sum(attribute='amount_invested') %}
+          {% set type_current = investments | selectattr('type','equalto',inv.type) | sum(attribute='current_value') %}
+          {% set type_gain = type_current - type_invested %}
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;">
+            <span>{{ inv.type }}</span>
+            <div style="text-align:right;">
+              <div style="font-family:'Syne',sans-serif;font-weight:700;">{{ currency }}{{ type_current|round(2) }}</div>
+              <div style="font-size:11px;color:{% if type_gain >= 0 %}var(--success){% else %}var(--danger){% endif %}">
+                {% if type_gain >= 0 %}+{% endif %}{{ currency }}{{ type_gain|round(2) }}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">All Investments</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Date</th>
+          <th>Invested</th>
+          <th>Current</th>
+          <th>Gain/Loss</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in investments %}
+        {% set gain = inv.current_value - inv.amount_invested %}
+        {% set gain_p = ((gain / inv.amount_invested) * 100)|round(1) if inv.amount_invested > 0 else 0 %}
+        <tr>
+          <td>
+            <div style="font-weight:500;">{{ inv.name }}</div>
+            {% if inv.notes %}<div style="font-size:11px;color:var(--text-muted);">{{ inv.notes }}</div>{% endif %}
+          </td>
+          <td><span class="badge badge-other" style="white-space:nowrap;">{{ inv.type }}</span></td>
+          <td style="color:var(--text-muted);font-size:13px;">{{ inv.date }}</td>
+          <td class="amount-cell">{{ currency }}{{ "%.2f"|format(inv.amount_invested) }}</td>
+          <td class="amount-cell">{{ currency }}{{ "%.2f"|format(inv.current_value) }}</td>
+          <td style="color:{% if gain >= 0 %}var(--success){% else %}var(--danger){% endif %};font-family:'Syne',sans-serif;font-weight:700;">
+            {% if gain >= 0 %}+{% endif %}{{ currency }}{{ "%.2f"|format(gain) }}
+            <span style="font-size:11px;font-family:'DM Sans',sans-serif;">({% if gain_p >= 0 %}+{% endif %}{{ gain_p }}%)</span>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <a href="{{ url_for('edit_investment', inv_id=inv.id) }}" class="btn btn-ghost btn-sm">Edit</a>
+              <form method="POST" action="{{ url_for('delete_investment', inv_id=inv.id) }}" onsubmit="return confirm('Delete this investment?')">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:60px;">
+  <div style="font-size:48px;margin-bottom:16px;">📈</div>
+  <p style="color:var(--text-muted);">No investments added yet. Click "Add Investment" to start tracking!</p>
+</div>
+{% endif %}
+
+<!-- ADD INVESTMENT MODAL -->
+<div id="addInvModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;">
+  <div class="card" style="width:540px;max-width:95vw;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;">Add Investment</h2>
+      <button onclick="document.getElementById('addInvModal').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('investments') }}">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Investment Name</label>
+          <input type="text" name="name" required placeholder="e.g. HDFC Top 100 Fund">
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select name="type" required>
+            {% for t in investment_types %}<option>{{ t }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" name="date" value="{{ today }}" required>
+        </div>
+        <div class="form-group">
+          <label>Amount Invested ({{ currency }})</label>
+          <input type="number" name="amount_invested" step="0.01" min="0" required placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Current Value ({{ currency }})</label>
+          <input type="number" name="current_value" step="0.01" min="0" required placeholder="0.00">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Notes (optional)</label>
+          <textarea name="notes" placeholder="e.g. SIP started, policy number, etc."></textarea>
+        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" onclick="document.getElementById('addInvModal').style.display='none'" class="btn btn-ghost">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Investment</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if investments %}
+<script>
+const typeLabels = {{ type_labels | tojson }};
+const typeValues = {{ type_values | tojson }};
+const colors = ['#7c6af7','#4ecdab','#f76a6a','#f5a524','#60a5fa','#e879f9','#4ade80','#fb923c','#a78bfa','#f472b6'];
+new Chart(document.getElementById('invChart'), {
+  type: 'doughnut',
+  data: {
+    labels: typeLabels,
+    datasets: [{ data: typeValues, backgroundColor: colors, borderWidth: 0 }]
+  },
+  options: {
+    plugins: { legend: { position: 'right', labels: { color: '#7a7a96', font: { size: 12 } } } },
+    cutout: '60%'
+  }
+});
+</script>
+{% endif %}
+{% endblock %}
